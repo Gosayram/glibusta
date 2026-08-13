@@ -271,7 +271,6 @@ final class ReaderController {
   Stream<ReaderState> get stateStream => _stateController.stream;
 
   void dispose() {
-    _disposed = true;
     _loadGeneration++;
     _settingsSub?.close();
     _linkHistory.clear();
@@ -289,6 +288,7 @@ final class ReaderController {
     _scrollController?.dispose();
     _flushSessionTime();
     _flushPages();
+    _disposed = true;
     savePosition();
     disposeChapterImagesCache();
     disposeChapterWordsCache();
@@ -350,9 +350,9 @@ final class ReaderController {
     _paused = true;
     if (_sessionStopwatch.isRunning) {
       _sessionStopwatch.stop();
+      _accumulatedSeconds += _sessionStopwatch.elapsed.inSeconds;
+      _sessionStopwatch.reset();
     }
-    _accumulatedSeconds += _sessionStopwatch.elapsed.inSeconds;
-    _sessionStopwatch.reset();
     _flushAccumulatedTime();
   }
 
@@ -394,6 +394,7 @@ final class ReaderController {
     _estimatedTotalWords = 0;
     _cacheMode = 'unknown';
     _chapterPositions = const [];
+    _lastScrollOffset = 0;
     _hideTimer?.cancel();
     _autoThemeTimer?.cancel();
     _autoThemeTimer = null;
@@ -749,11 +750,7 @@ final class ReaderController {
   // ── Scroll / progress ─────────────────────────────────
 
   ScrollController get scrollController {
-    if (_disposed) {
-      // Avoid creating (and leaking) a fresh controller after disposal;
-      // return the existing (disposed) instance when present.
-      if (_scrollController != null) return _scrollController!;
-    }
+    if (_disposed) return _scrollController ?? ScrollController();
     _scrollController ??= ScrollController()..addListener(_onScroll);
     return _scrollController!;
   }
@@ -1257,6 +1254,7 @@ final class ReaderController {
         newCh = ch - 1;
         final prev = _state.loadedChapters[newCh];
         newPara = prev != null ? prev.blocks.length - 1 : 0;
+        if (newPara < 0) newPara = 0;
       } else if (newPara >= (chapter.blocks.length)) {
         // Go to next chapter's first paragraph
         if (ch + 1 < _state.chapterCount) {
@@ -1264,6 +1262,7 @@ final class ReaderController {
           newPara = 0;
         } else {
           newPara = chapter.blocks.length - 1;
+          if (newPara < 0) newPara = 0;
         }
       }
     }

@@ -639,8 +639,7 @@ fn reject_encrypted_mobi(header: &MobiHeader) -> Result<()> {
     Ok(())
 }
 
-fn is_likely_kf8(header: &MobiHeader, record0: &[u8]) -> bool {
-    let _ = header;
+fn is_likely_kf8(record0: &[u8]) -> bool {
     let (text, _, _) = encoding_rs::WINDOWS_1252.decode(record0);
     text.contains("BOUNDARY") || text.contains("FDST") || text.contains("RESC")
 }
@@ -847,7 +846,7 @@ pub fn parse_mobi(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     );
     meta.insert(
         "mobiKf8Likely".to_string(),
-        serde_json::json!(using_kf8 || is_likely_kf8(&header, record0)),
+        serde_json::json!(using_kf8 || is_likely_kf8(record0)),
     );
     meta.insert(
         "mobiTocSource".to_string(),

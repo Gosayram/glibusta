@@ -50,23 +50,12 @@ class BookSearchService {
     if (query.trim().isEmpty) return const [];
     final gen = ++_searchGeneration;
 
+    // ponytail: Rust searchInBook does case-insensitive substring only.
+    // For matchCase/useRegex/wholeWord, use the in-memory path directly.
+    final hasOptions = matchCase || useRegex || wholeWord;
+
     List<_RustMatch> matches;
-    try {
-      final rawMatches = await rust_api.searchInBook(
-        path: _filePath,
-        query: query,
-        limit: BigInt.from(maxResults),
-      );
-      matches = rawMatches
-          .map((m) => _RustMatch(
-                chapterIndex: m.chapterIndex,
-                blockIndex: m.blockIndex,
-                spanStart: m.spanStart.toInt(),
-                spanEnd: m.spanEnd.toInt(),
-                preview: m.preview,
-              ))
-          .toList();
-    } on Object catch (_) {
+    if (hasOptions) {
       matches = _searchInMemory(
         query,
         maxResults,
@@ -74,6 +63,31 @@ class BookSearchService {
         useRegex: useRegex,
         wholeWord: wholeWord,
       );
+    } else {
+      try {
+        final rawMatches = await rust_api.searchInBook(
+          path: _filePath,
+          query: query,
+          limit: BigInt.from(maxResults),
+        );
+        matches = rawMatches
+            .map((m) => _RustMatch(
+                  chapterIndex: m.chapterIndex,
+                  blockIndex: m.blockIndex,
+                  spanStart: m.spanStart.toInt(),
+                  spanEnd: m.spanEnd.toInt(),
+                  preview: m.preview,
+                ))
+            .toList();
+      } on Object catch (_) {
+        matches = _searchInMemory(
+          query,
+          maxResults,
+          matchCase: matchCase,
+          useRegex: useRegex,
+          wholeWord: wholeWord,
+        );
+      }
     }
 
     if (gen != _searchGeneration) return const [];
@@ -226,7 +240,9 @@ class BookSearchService {
     return results;
   }
 
-  static bool _isWordChar(String c) => c.isNotEmpty && RegExp(r'\w').hasMatch(c);
+  // ponytail: \w is ASCII-only in Dart; use Unicode letter check for Cyrillic
+  static final _wordCharRe = RegExp(r'[\p{L}\p{N}_]', unicode: true);
+  static bool _isWordChar(String c) => c.isNotEmpty && _wordCharRe.hasMatch(c);
 }
 
 class _RustMatch {

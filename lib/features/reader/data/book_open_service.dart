@@ -203,14 +203,18 @@ class BookOpenService {
     final resolved = <String, String>{};
 
     for (final assetId in assetIds) {
+      File? temporaryFile;
       try {
         final imageFile = File('${imagesDir.path}/${_docxImageFileName(assetId)}');
         final bytes = await rust_api.getAssetBytes(path: filePath, assetId: assetId);
-        final temporaryFile = File('${imageFile.path}.tmp');
+        temporaryFile = File('${imageFile.path}.tmp');
         await temporaryFile.writeAsBytes(bytes, flush: true);
         await temporaryFile.rename(imageFile.path);
         resolved[assetId] = imageFile.path;
       } on Object catch (e, st) {
+        if (temporaryFile != null) {
+          try { await temporaryFile.delete(); } on Object catch (_) {}
+        }
         _logger.warning(
           'Unable to materialize archive image $assetId',
           name: 'Reader',

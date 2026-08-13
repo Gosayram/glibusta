@@ -749,7 +749,7 @@ class BookImportService {
     }
 
     final importableFiles = <File>[];
-    await for (final entity in dir.list(recursive: true)) {
+    await for (final entity in dir.list(recursive: true, followLinks: false)) {
       if (entity is File) {
         final ext = entity.path.split('.').last.toLowerCase();
         if (importableExtensions.contains(ext)) {

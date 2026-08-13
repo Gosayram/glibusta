@@ -3,15 +3,23 @@
 
 use anyhow::Result;
 use pdfium_render::prelude::*;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
-pub struct PdfEngine {
-    bindings: Pdfium,
+static PDFIUM: OnceLock<Mutex<Pdfium>> = OnceLock::new();
+
+fn pdfium() -> Result<MutexGuard<'static, Pdfium>> {
+    let mutex = PDFIUM
+        .get_or_try_init(|| Pdfium::bind_to_system_library().map(Pdfium::new).map(Mutex::new))
+        .map_err(|e| anyhow::anyhow!("PDFium init failed: {e}"))?;
+    Ok(mutex.lock().unwrap())
 }
+
+pub struct PdfEngine;
 
 impl PdfEngine {
     pub fn new() -> Result<Self> {
-        let bindings = Pdfium::new(Pdfium::bind_to_system_library()?);
-        Ok(Self { bindings })
+        pdfium()?;
+        Ok(Self)
     }
 
     pub fn render_page_to_png(
@@ -20,7 +28,8 @@ impl PdfEngine {
         page_index: usize,
         max_width: u16,
     ) -> Result<Vec<u8>> {
-        let document = self.bindings.load_pdf_from_byte_slice(bytes, None)?;
+        let pdfium = pdfium()?;
+        let document = pdfium.load_pdf_from_byte_slice(bytes, None)?;
         let page = document.pages().get(page_index as i32)?;
         let viewport_width = (max_width as i32).min(1080);
         let render_cfg = PdfRenderConfig::new()
@@ -35,7 +44,8 @@ impl PdfEngine {
     }
 
     pub fn extract_text(&self, bytes: &[u8]) -> Result<String> {
-        let document = self.bindings.load_pdf_from_byte_slice(bytes, None)?;
+        let pdfium = pdfium()?;
+        let document = pdfium.load_pdf_from_byte_slice(bytes, None)?;
         let mut text = String::new();
         for i in 0..document.pages().len() {
             let page = document.pages().get(i)?;
@@ -47,7 +57,8 @@ impl PdfEngine {
     }
 
     pub fn page_count(&self, bytes: &[u8]) -> Result<i32> {
-        let document = self.bindings.load_pdf_from_byte_slice(bytes, None)?;
+        let pdfium = pdfium()?;
+        let document = pdfium.load_pdf_from_byte_slice(bytes, None)?;
         Ok(document.pages().len())
     }
 }

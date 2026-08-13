@@ -333,14 +333,8 @@ fn parse_fb2_xml(
                     b"binary" => {
                         let binary_id = get_xml_attr(e, b"id").unwrap_or_default();
                         current_binary_media_type = get_xml_attr(e, b"content-type");
-                        if binary_id.starts_with("cover") && cover_data.is_none() {
-                            in_binary = true;
-                            current_binary_id = Some(binary_id);
-                        } else {
-                            // Still track for inline image lookups
-                            in_binary = true;
-                            current_binary_id = Some(binary_id);
-                        }
+                        in_binary = true;
+                        current_binary_id = Some(binary_id);
                         current_text.clear();
                     }
                     b"body" => {

@@ -22,9 +22,15 @@ impl<'a> ZipFile<'a> {
         let cursor = Cursor::new(bytes);
         let mut archive = ZipArchive::new(cursor).context("Failed to open ZIP archive")?;
 
-        // Reject zip bombs with overlapping file entries
-        if archive.has_overlapping_files().unwrap_or(false) {
-            anyhow::bail!("ZIP archive contains overlapping files (potential zip bomb)");
+        // Reject zip bombs with overlapping file entries (fail-closed on Err)
+        match archive.has_overlapping_files() {
+            Ok(true) => {
+                anyhow::bail!("ZIP archive contains overlapping files (potential zip bomb)");
+            }
+            Err(_) => {
+                anyhow::bail!("ZIP archive integrity check failed (potential zip bomb)");
+            }
+            Ok(false) => {}
         }
 
         // Reject archives exceeding safe decompressed size
