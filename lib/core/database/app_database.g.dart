@@ -8880,6 +8880,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_reading_sessions_bookId',
     'CREATE INDEX idx_reading_sessions_bookId ON reading_sessions (book_id)',
   );
+  late final Index idxReadingSessionsStartedAt = Index(
+    'idx_reading_sessions_startedAt',
+    'CREATE INDEX idx_reading_sessions_startedAt ON reading_sessions (started_at)',
+  );
   late final Index idxBookTagsTagId = Index(
     'idx_book_tags_tag_id',
     'CREATE INDEX idx_book_tags_tag_id ON book_tags (tag_id)',
@@ -8940,6 +8944,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxQuotesBookId,
     idxBookCollectionsCollectionId,
     idxReadingSessionsBookId,
+    idxReadingSessionsStartedAt,
     idxBookTagsTagId,
     idxTextHighlightsBookId,
     idxTextHighlightsChapterId,

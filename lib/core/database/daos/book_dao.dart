@@ -5,7 +5,19 @@ import '../tables.dart';
 
 part 'book_dao.g.dart';
 
-@DriftAccessor(tables: [SavedBooks, ReadingProgress, ReadingSessions])
+@DriftAccessor(
+  tables: [
+    SavedBooks,
+    ReadingProgress,
+    ReadingSessions,
+    Bookmarks,
+    Notes,
+    Quotes,
+    TextHighlights,
+    ReadingTime,
+    BookCollections,
+  ],
+)
 class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
   BookDao(super.attachedDatabase);
 
@@ -90,6 +102,12 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
   Future<int> deleteBook(String id) => transaction(() async {
     await (delete(readingProgress)..where((t) => t.bookId.equals(id))).go();
     await (delete(readingSessions)..where((t) => t.bookId.equals(id))).go();
+    await (delete(bookmarks)..where((t) => t.bookId.equals(id))).go();
+    await (delete(notes)..where((t) => t.bookId.equals(id))).go();
+    await (delete(quotes)..where((t) => t.bookId.equals(id))).go();
+    await (delete(textHighlights)..where((t) => t.bookId.equals(id))).go();
+    await (delete(readingTime)..where((t) => t.bookId.equals(id))).go();
+    await (delete(bookCollections)..where((t) => t.bookId.equals(id))).go();
     return (delete(savedBooks)..where((t) => t.id.equals(id))).go();
   });
 
@@ -109,10 +127,14 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
     final deletedIds = await getDeletedBooks().then((books) => books.map((b) => b.id).toList());
     if (deletedIds.isEmpty) return 0;
     return transaction(() async {
-      for (final id in deletedIds) {
-        await (delete(readingProgress)..where((t) => t.bookId.equals(id))).go();
-        await (delete(readingSessions)..where((t) => t.bookId.equals(id))).go();
-      }
+      await (delete(readingProgress)..where((t) => t.bookId.isIn(deletedIds))).go();
+      await (delete(readingSessions)..where((t) => t.bookId.isIn(deletedIds))).go();
+      await (delete(bookmarks)..where((t) => t.bookId.isIn(deletedIds))).go();
+      await (delete(notes)..where((t) => t.bookId.isIn(deletedIds))).go();
+      await (delete(quotes)..where((t) => t.bookId.isIn(deletedIds))).go();
+      await (delete(textHighlights)..where((t) => t.bookId.isIn(deletedIds))).go();
+      await (delete(readingTime)..where((t) => t.bookId.isIn(deletedIds))).go();
+      await (delete(bookCollections)..where((t) => t.bookId.isIn(deletedIds))).go();
       return (delete(savedBooks)..where((t) => t.deletedAt.isNotNull())).go();
     });
   }

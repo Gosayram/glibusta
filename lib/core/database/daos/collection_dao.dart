@@ -75,16 +75,13 @@ class CollectionDao extends DatabaseAccessor<AppDatabase> with _$CollectionDaoMi
   }
 
   Future<List<SavedBook>> getBooksInCollection(String collectionId) async {
-    final bcRows =
-        await (select(bookCollections)
-              ..where((t) => t.collectionId.equals(collectionId))
-              ..orderBy([(t) => OrderingTerm.asc(t.addedAt)]))
-            .get();
-    if (bcRows.isEmpty) return [];
-    final bookIds = bcRows.map((r) => r.bookId).toList();
-    return (select(savedBooks)..where(
-          (t) => t.id.isIn(bookIds) & t.deletedAt.isNull(),
-        ))
-        .get();
+    final query =
+        select(savedBooks).join([
+            innerJoin(bookCollections, bookCollections.bookId.equalsExp(savedBooks.id)),
+          ])
+          ..where(bookCollections.collectionId.equals(collectionId) & savedBooks.deletedAt.isNull())
+          ..orderBy([OrderingTerm.asc(bookCollections.addedAt)]);
+    final rows = await query.get();
+    return rows.map((row) => row.readTable(savedBooks)).toList();
   }
 }

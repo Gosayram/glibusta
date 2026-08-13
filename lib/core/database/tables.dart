@@ -192,6 +192,7 @@ class BookCollections extends Table {
 }
 
 @TableIndex(name: 'idx_reading_sessions_bookId', columns: {#bookId})
+@TableIndex(name: 'idx_reading_sessions_startedAt', columns: {#startedAt})
 class ReadingSessions extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get bookId => text()();

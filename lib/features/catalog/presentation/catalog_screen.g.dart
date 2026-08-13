@@ -46,7 +46,7 @@ final class CategoriesProvider
   }
 }
 
-String _$categoriesHash() => r'd53efa2f220be02e355180bf6b35052d7f0b05c0';
+String _$categoriesHash() => r'6592cdd0cc9d4f06121cc9164b2aecbc9d7d112a';
 
 @ProviderFor(popularBooks)
 final popularBooksProvider = PopularBooksProvider._();
@@ -79,4 +79,4 @@ final class PopularBooksProvider
   }
 }
 
-String _$popularBooksHash() => r'54b11958819f81227f363fa036c8b43285053eae';
+String _$popularBooksHash() => r'84b80e31b2dbdcddad37af65884c5032b1e93c9f';

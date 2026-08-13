@@ -227,14 +227,24 @@ class ReadingTimeDao extends DatabaseAccessor<AppDatabase> with _$ReadingTimeDao
   Future<Map<int, int>> getReadingHours(int days) async {
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
-    final results = await (select(
-      readingTime,
-    )..where((t) => t.date.isBiggerOrEqualValue(start))).get();
+    final sessions =
+        await (select(attachedDatabase.readingSessions)
+              ..where((t) => t.startedAt.isBiggerOrEqualValue(start) & t.endedAt.isNotNull())
+              ..orderBy([(t) => OrderingTerm.asc(t.startedAt)]))
+            .get();
 
     final hourlySeconds = <int, int>{};
-    for (final row in results) {
-      final hour = row.updatedAt.hour;
-      hourlySeconds[hour] = (hourlySeconds[hour] ?? 0) + row.readingTimeSeconds;
+    for (final session in sessions) {
+      final ended = session.endedAt!;
+      // Split session across hours it spans
+      var cursor = session.startedAt;
+      while (cursor.isBefore(ended)) {
+        final hourEnd = DateTime(cursor.year, cursor.month, cursor.day, cursor.hour + 1);
+        final segEnd = hourEnd.isBefore(ended) ? hourEnd : ended;
+        final secs = segEnd.difference(cursor).inSeconds;
+        hourlySeconds[cursor.hour] = (hourlySeconds[cursor.hour] ?? 0) + secs;
+        cursor = segEnd;
+      }
     }
     return hourlySeconds;
   }

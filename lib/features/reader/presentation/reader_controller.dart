@@ -452,7 +452,6 @@ final class ReaderController {
       final savedPosition = await _progress!.loadSavedPosition(meta.chapterCount);
       if (!_isActiveLoad(loadGeneration)) return;
 
-      _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.loadingChapters));
       _updateState(
         _state.copyWith(
           metadata: meta,
@@ -786,13 +785,14 @@ final class ReaderController {
         final now = DateTime.now();
         final dt = now.difference(lastTick).inMicroseconds / 1000000.0;
         lastTick = now;
+        final clampedDt = dt < 0.1 ? dt : 0.1; // ponytail: cap at 100ms to survive GC pauses
         final current = _scrollController!.offset;
         final max = _scrollController!.position.maxScrollExtent;
         if (current >= max) {
           stopAutoScroll();
           return;
         }
-        unawaited(_scrollController!.position.moveTo(current + autoScrollSpeed.value * dt));
+        unawaited(_scrollController!.position.moveTo(current + autoScrollSpeed.value * clampedDt));
       } on Object {
         stopAutoScroll();
       }
@@ -1015,13 +1015,14 @@ final class ReaderController {
     return (remainingWords / effectiveWpm).ceil();
   }
 
+  static final _wordPattern = RegExp(r'\S+');
+
   void _rebuildChapterWordCounts() {
     _chapterWordCounts.clear();
-    final pattern = RegExp(r'\S+');
     for (final entry in _state.loadedChapters.entries) {
       var words = 0;
       for (final block in entry.value.blocks) {
-        words += pattern.allMatches(block.text).length;
+        words += _wordPattern.allMatches(block.text).length;
       }
       _chapterWordCounts[entry.key] = words;
     }
@@ -1510,6 +1511,7 @@ final class ReaderController {
         break;
       case DoubleTapAction.searchInBook:
         toggleSearch();
+        break;
       case DoubleTapAction.disabled:
         break;
     }
