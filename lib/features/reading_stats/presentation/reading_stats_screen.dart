@@ -828,6 +828,24 @@ class _GoalCard extends ConsumerWidget {
           );
         }
 
+        if (goal.dailyMinutes <= 0) {
+          return Card(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => ReadingGoalDialog.show(context),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(Icons.flag_outlined, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text('Установить цель чтения', style: Theme.of(context).textTheme.titleSmall)),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
         final progress = todayMinutes / goal.dailyMinutes;
         final progressClamped = progress.clamp(0.0, 1.0);
         final isMet = progress >= 1.0;
@@ -1011,16 +1029,22 @@ class _ReadingHoursChart extends ConsumerWidget {
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               Expanded(
-                                child: Container(
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    color: ratio > 0
-                                        ? Theme.of(context).colorScheme.primary.withValues(
-                                            alpha: 0.3 + ratio * 0.7,
-                                          )
-                                        : Colors.transparent,
-                                    borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(2),
+                                child: Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: FractionallySizedBox(
+                                    heightFactor: ratio,
+                                    child: Container(
+                                      width: double.infinity,
+                                      decoration: BoxDecoration(
+                                        color: ratio > 0
+                                            ? Theme.of(context).colorScheme.primary.withValues(
+                                                alpha: 0.3 + ratio * 0.7,
+                                              )
+                                            : Colors.transparent,
+                                        borderRadius: const BorderRadius.vertical(
+                                          top: Radius.circular(2),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1223,7 +1247,7 @@ class _TodayProgressCard extends ConsumerWidget {
 
     return goalAsync.when(
       data: (goal) {
-        if (!goal.isEnabled) return const SizedBox.shrink();
+        if (!goal.isEnabled || goal.dailyMinutes <= 0) return const SizedBox.shrink();
 
         final progress = (todayMinutes / goal.dailyMinutes).clamp(0.0, 1.0);
         final isMet = todayMinutes >= goal.dailyMinutes;

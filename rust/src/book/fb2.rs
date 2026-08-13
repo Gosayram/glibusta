@@ -685,6 +685,8 @@ fn parse_fb2_xml(
                     current_date.push_str(&text);
                 } else if publish_field.is_some() {
                     current_publish_value.push_str(&text);
+                } else if in_annotation {
+                    description = Some(description.take().unwrap_or_default() + &text);
                 } else if in_pre && in_body {
                     current_text.push_str(&text);
                 } else if in_p && in_body {
@@ -1391,7 +1393,7 @@ fn parse_fb2_xml(
                             sequences.push(sequence);
                         }
                     }
-                    b"empty-line" if in_body => {
+                    b"empty-line" if in_body && !in_notes_body => {
                         body_blocks.push(ReaderBlock {
                             index: block_index,
                             text: String::new(),
