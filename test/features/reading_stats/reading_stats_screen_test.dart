@@ -49,7 +49,6 @@ void main() {
         readingHoursProvider.overrideWithValue(
           AsyncData(List<int>.filled(24, 0)),
         ),
-        currentSessionStartProvider.overrideWithValue(null),
         sessionTimerProvider.overrideWith(
           (ref) => Stream<DateTime>.value(DateTime.now()),
         ),

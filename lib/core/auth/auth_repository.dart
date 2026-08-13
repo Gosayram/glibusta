@@ -113,12 +113,15 @@ class AuthRepository {
   }
 
   String? _extractFormValue(String html, String fieldName) {
-    final regex = RegExp(
-      '<input[^>]*name="$fieldName"[^>]*value="([^"]*)"',
+    final tagRegex = RegExp(
+      '<input[^>]*name="$fieldName"[^>]*>',
       caseSensitive: false,
     );
-    final match = regex.firstMatch(html);
-    return match?.group(1);
+    final tagMatch = tagRegex.firstMatch(html);
+    if (tagMatch == null) return null;
+    final valueRegex = RegExp(r'value="([^"]*)"');
+    final valueMatch = valueRegex.firstMatch(tagMatch.group(0)!);
+    return valueMatch?.group(1);
   }
 }
 
@@ -218,24 +221,33 @@ final flutterSecureStorageProvider = Provider<FlutterSecureStorage>(
 class AuthStateNotifier extends _$AuthStateNotifier {
   @override
   Future<AuthStateData> build() async {
-    final prefs = await SharedPreferences.getInstance();
-    final name = prefs.getString(_kSessionNameKey);
-    if (name == null || name.isEmpty) {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final name = prefs.getString(_kSessionNameKey);
+      if (name == null || name.isEmpty) {
+        return const AuthStateData();
+      }
+      final mail = prefs.getString(_kSessionMailKey);
+      final secureStorage = ref.read(flutterSecureStorageProvider);
+      final cookiesRaw = await secureStorage.read(key: _kSessionCookiesKey);
+      final cookies = cookiesRaw != null && cookiesRaw.isNotEmpty
+          ? Map<String, String>.from(Uri.splitQueryString(cookiesRaw))
+          : <String, String>{};
+      if (cookies.isEmpty) {
+        return const AuthStateData();
+      }
+      return AuthStateData(
+        isAuthenticated: true,
+        session: UserSession(name: name, mail: mail, cookies: cookies),
+      );
+    } on Object catch (e) {
+      AppLogger().warning(
+        'Failed to restore session from storage: $e',
+        name: 'Auth',
+        error: e,
+      );
       return const AuthStateData();
     }
-    final mail = prefs.getString(_kSessionMailKey);
-    final secureStorage = ref.read(flutterSecureStorageProvider);
-    final cookiesRaw = await secureStorage.read(key: _kSessionCookiesKey);
-    final cookies = cookiesRaw != null && cookiesRaw.isNotEmpty
-        ? Map<String, String>.from(Uri.splitQueryString(cookiesRaw))
-        : <String, String>{};
-    if (cookies.isEmpty) {
-      return const AuthStateData();
-    }
-    return AuthStateData(
-      isAuthenticated: true,
-      session: UserSession(name: name, mail: mail, cookies: cookies),
-    );
   }
 
   Future<void> login(String name, String password, bool persistent) async {
@@ -285,7 +297,13 @@ class AuthStateNotifier extends _$AuthStateNotifier {
       await prefs.remove(_kSessionMailKey);
       final secureStorage = ref.read(flutterSecureStorageProvider);
       await secureStorage.delete(key: _kSessionCookiesKey);
-    } on Object catch (_) {}
+    } on Object catch (e) {
+      AppLogger().warning(
+        'Local session cleanup failed: $e',
+        name: 'Auth',
+        error: e,
+      );
+    }
     state = const AsyncValue.data(AuthStateData());
   }
 
@@ -300,8 +318,15 @@ class AuthStateNotifier extends _$AuthStateNotifier {
 
   Future<bool> tryAutoLogin() async {
     final secureStorage = ref.read(flutterSecureStorageProvider);
-    final username = await secureStorage.read(key: 'auth_username');
-    final password = await secureStorage.read(key: 'auth_password');
+    String? username;
+    String? password;
+    try {
+      username = await secureStorage.read(key: 'auth_username');
+      password = await secureStorage.read(key: 'auth_password');
+    } on Object catch (e) {
+      AppLogger().warning('Failed to read stored credentials: $e', name: 'Auth', error: e);
+      return false;
+    }
     if (username == null || password == null || username.isEmpty || password.isEmpty) {
       return false;
     }

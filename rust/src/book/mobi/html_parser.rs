@@ -412,7 +412,9 @@ impl MobiHtmlParser {
                     i = tag_end + 1;
                     let close_tag: Vec<char> = format!("</{}>", name).chars().collect();
                     if let Some(close_idx) = chars[i..].windows(close_tag.len()).position(|w| {
-                        w.iter().zip(&close_tag).all(|(a, b)| a.eq_ignore_ascii_case(b))
+                        w.iter()
+                            .zip(&close_tag)
+                            .all(|(a, b)| a.eq_ignore_ascii_case(b))
                     }) {
                         let inner: String = chars[i..i + close_idx].iter().collect();
                         buf.push_str(&inner);
@@ -457,7 +459,9 @@ impl MobiHtmlParser {
                         buf.clear();
                     }
                     if let Some(close_idx) = chars[i..].windows(6).position(|w| {
-                        w[0] == '<' && w[1] == '/' && w[5] == '>'
+                        w[0] == '<'
+                            && w[1] == '/'
+                            && w[5] == '>'
                             && w[2].eq_ignore_ascii_case(&'d')
                             && w[3].eq_ignore_ascii_case(&'i')
                             && w[4].eq_ignore_ascii_case(&'v')

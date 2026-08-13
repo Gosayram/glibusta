@@ -1399,7 +1399,11 @@ fn parse_css_rules(css: &str) -> HashMap<String, HashMap<String, String>> {
         // Filter selector: class selectors and simple tag selectors only
         // Handle comma-separated selectors (e.g. "h1, h2, h3 { ... }")
         let mut dominated = false;
-        for sel in selector.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        for sel in selector
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
             let valid = sel.starts_with('.') || (!sel.contains(' ') && !sel.contains(':'));
             if valid {
                 let props = rules.entry(sel.to_string()).or_default();
@@ -2372,7 +2376,10 @@ fn parse_xhtml_to_blocks(
                         in_block = false;
                         block_type = BlockType::Paragraph;
                     }
-                    b"p" | b"pre" if in_block && matches!(block_type, BlockType::Paragraph | BlockType::Quote) => {
+                    b"p" | b"pre"
+                        if in_block
+                            && matches!(block_type, BlockType::Paragraph | BlockType::Quote) =>
+                    {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
