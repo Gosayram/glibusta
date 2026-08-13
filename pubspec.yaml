@@ -76,7 +76,7 @@ dependencies:
   # UI & Theming
   flex_color_scheme: ^8.4.0
   flutter_animate: ^4.5.2
-  flutter_smart_dialog: ^5.1.0
+  flutter_smart_dialog: ^5.1.1
 
   # Analytics & Monitoring
   shared_preferences: ^2.5.5
