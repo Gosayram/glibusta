@@ -553,11 +553,19 @@ fn chapter_has_renderable_content(chapter: &ReaderChapter) -> bool {
 }
 
 fn toc_has_invalid_chapter(entries: &[TocEntry], chapter_count: i32) -> bool {
-    entries.iter().any(|entry| {
-        entry.chapter_index < 0
-            || entry.chapter_index >= chapter_count
-            || toc_has_invalid_chapter(&entry.children, chapter_count)
-    })
+    let mut stack: Vec<(&[TocEntry], usize)> = vec![(entries, 0)];
+    while let Some((current, depth)) = stack.pop() {
+        if depth > 100 {
+            return true;
+        }
+        for entry in current {
+            if entry.chapter_index < 0 || entry.chapter_index >= chapter_count {
+                return true;
+            }
+            stack.push((&entry.children, depth + 1));
+        }
+    }
+    false
 }
 
 /// Repair a book: remove empty chapters, deduplicate, fix TOC/chapter index mapping.
@@ -605,10 +613,13 @@ fn repair_toc_entries(
     entries: &mut Vec<TocEntry>,
     old_to_new: &std::collections::HashMap<i32, i32>,
 ) {
-    entries.retain(|entry| old_to_new.contains_key(&entry.chapter_index));
-    for entry in entries {
-        entry.chapter_index = old_to_new[&entry.chapter_index];
-        repair_toc_entries(&mut entry.children, old_to_new);
+    let mut stack: Vec<&mut Vec<TocEntry>> = vec![entries];
+    while let Some(current) = stack.pop() {
+        current.retain(|entry| old_to_new.contains_key(&entry.chapter_index));
+        for entry in current {
+            entry.chapter_index = old_to_new[&entry.chapter_index];
+            stack.push(&mut entry.children);
+        }
     }
 }
 

@@ -1059,6 +1059,18 @@ fn resolve_toc_entries(
     toc_document_href: &str,
     spine_chapter_indices: &HashMap<String, i32>,
 ) -> Vec<TocEntry> {
+    resolve_toc_entries_inner(entries, toc_document_href, spine_chapter_indices, 0)
+}
+
+fn resolve_toc_entries_inner(
+    entries: Vec<ParsedTocEntry>,
+    toc_document_href: &str,
+    spine_chapter_indices: &HashMap<String, i32>,
+    depth: usize,
+) -> Vec<TocEntry> {
+    if depth > 100 {
+        return Vec::new();
+    }
     entries
         .into_iter()
         .filter_map(|entry| {
@@ -1067,10 +1079,11 @@ fn resolve_toc_entries(
             Some(TocEntry {
                 title: entry.title,
                 chapter_index,
-                children: resolve_toc_entries(
+                children: resolve_toc_entries_inner(
                     entry.children,
                     toc_document_href,
                     spine_chapter_indices,
+                    depth + 1,
                 ),
             })
         })
@@ -1396,8 +1409,9 @@ fn expand_media_queries(css: &str) -> String {
                 }
             }
         }
-        result.push(bytes[i] as char);
-        i += 1;
+        let ch = css[i..].chars().next().unwrap();
+        result.push(ch);
+        i += ch.len_utf8();
     }
     result
 }
@@ -2530,7 +2544,6 @@ fn parse_xhtml_to_blocks(
                                 href = None;
                                 block_class = None;
                                 block_inline_style = None;
-                                blockquote_depth = (blockquote_depth - 1).max(0);
                             }
                         }
                     }
@@ -2585,6 +2598,7 @@ fn parse_xhtml_to_blocks(
                         href = None;
                         block_class = None;
                         block_inline_style = None;
+                        blockquote_depth = blockquote_depth.saturating_sub(1);
                     }
                     b"td" | b"th" if in_table => {
                         let t = span_text.trim().to_string();
